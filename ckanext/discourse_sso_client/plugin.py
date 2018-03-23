@@ -2,11 +2,17 @@
 
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
-import ckan.lib.helpers as helpers
 import logging
 import pylons
 from ckan.common import config
 import os
+from urllib import urlencode
+import base64
+import hmac
+import hashlib
+from urlparse import parse_qs
+import re
+
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +43,32 @@ class SSOPlugin(plugins.SingletonPlugin):
         username is created and access given.
         """
         logger.info("\n\nLOGIN\n\n")
-        toolkit.redirect_to(get_sso_url())
+
+        params = toolkit.request.params
+
+        if 'sso' in params and 'sig' in params:
+            # Returns response as parse_qs dict on success, aborts on failure
+            response = validate_response(params)
+
+            # The SSO provider has securely identified someone for us.
+            # Now get or create the user.
+
+            email = response['email'][0]
+            user = get_user(email)
+            if not user:
+                # A user with this email address doesn't yet exist in CKAN,
+                # so create one.
+                user = toolkit.get_action('user_create')(
+                    context={'ignore_auth': True},
+                    data_dict={'email': email,
+                               'name': generate_user_name(email),
+                               'password': generate_password()})
+
+            pylons.session['ckanext-discourse-sso-client-user'] = user['name']
+            pylons.session.save()
+
+        else:
+            start_sso()
 
     def identify(self):
         '''Identify which user (if any) is logged-in via Persona.
@@ -46,17 +77,15 @@ class SSOPlugin(plugins.SingletonPlugin):
         logger.info("\n\nIDENTIFY\n\n")
 
         # Try to get the item that login() placed in the session.
-        user = pylons.session.get('ckanext-persona-user')
+        user = pylons.session.get('ckanext-discourse-sso-client-user')
         if user:
             # We've found a logged-in user. Set c.user to let CKAN know.
             toolkit.c.user = user
 
     def _delete_session_items(self):
         import pylons
-        if 'ckanext-persona-user' in pylons.session:
-            del pylons.session['ckanext-persona-user']
-        if 'ckanext-persona-email' in pylons.session:
-            del pylons.session['ckanext-persona-email']
+        if 'ckanext-discourse-sso-client-user' in pylons.session:
+            del pylons.session['ckanext-discourse-sso-client-user']
         pylons.session.save()
 
     def logout(self):
@@ -72,6 +101,48 @@ class SSOPlugin(plugins.SingletonPlugin):
         self._delete_session_items()
 
 
+def start_sso():
+    nonce = os.urandom(24).encode('hex')
+    raw_payload = urlencode({'nonce': nonce})
+    payload = base64.encodestring(raw_payload)
+    sig = sign(payload)
+    qs = urlencode({'sso': payload, 'sig': sig})
+    sso_url = "%s?%s" % (get_sso_url(), qs)
+
+    pylons.session['ckanext-discourse-sso-client-nonce'] = nonce
+    pylons.session.save()
+    toolkit.redirect_to(sso_url)
+
+
+def validate_response(params):
+    """
+    Checks that
+    - the signature is valid for the payload
+    - the nonce is the same one used to initiate the login
+    Deletes a valid nonce to avoid replay.
+    DOES NOT save session - expects caller to do so
+    """
+    payload = params['sso']
+    sig = unicode(sign(payload))
+    if not hmac.compare_digest(sig, params['sig']):
+        logger.debug("Invalid signature")
+        toolkit.abort(401)
+    raw_payload = base64.decodestring(payload)
+    response = parse_qs(raw_payload)
+    nonce = pylons.session['ckanext-discourse-sso-client-nonce']
+    if not hmac.compare_digest(nonce, response['nonce'][0]):
+        toolkit.abort(401)
+        logger.debug("Invalid nonce")
+    # Delete validated nonce to avoid replay
+    del pylons.session['ckanext-discourse-sso-client-nonce']
+    return response
+
+
+def sign(payload):
+    key = get_sso_secret()
+    return hmac.new(key, payload, digestmod=hashlib.sha256).hexdigest()
+
+
 def get_user(email):
     '''Return the CKAN user with the given email address.
     :rtype: A CKAN user dict
@@ -81,9 +152,9 @@ def get_user(email):
     import ckan.model
     users = ckan.model.User.by_email(email)
 
-    assert len(users) in (0, 1), ("The Persona plugin doesn't know what to do "
-                                  "when CKAN has more than one user with the "
-                                  "same email address.")
+    assert len(users) in (0, 1), ("The Discourse-SSO-Client plugin doesn't know"
+                                  " what to do when CKAN has more than one user"
+                                  " with the same email address.")
 
     if users:
 
@@ -95,6 +166,14 @@ def get_user(email):
 
     else:
         return None
+
+
+def generate_user_name(email):
+    '''Generate a random user name for the given email address.
+    '''
+    username = re.sub('@.+', '', email)
+    username = re.sub('\W+', '_', username)
+    return str(username)
 
 
 def generate_password():
