@@ -12,6 +12,7 @@ import hmac
 import hashlib
 from urlparse import parse_qs
 import re
+import ckan.lib.helpers as helpers
 
 
 logger = logging.getLogger(__name__)
@@ -66,8 +67,13 @@ class SSOPlugin(plugins.SingletonPlugin):
 
             pylons.session['ckanext-discourse-sso-client-user'] = user['name']
             pylons.session.save()
+            self.identify()
+
+            came_from = pylons.session.get('ckanext-discourse-sso-client-came_from', '')
+            helpers.redirect_to(controller='user', action='logged_in', came_from=came_from)
 
         else:
+            pylons.session['ckanext-discourse-sso-client-came_from'] = params.get('came_from', '')
             start_sso()
 
     def identify(self):
