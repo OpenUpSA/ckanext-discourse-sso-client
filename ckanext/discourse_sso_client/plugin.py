@@ -1,6 +1,7 @@
 # Based on https://github.com/ckan/ckanext-persona/blob/master/ckanext/persona/plugin.py
 
 from ckan.common import config
+from ckan.model import User, core, meta
 from urllib import urlencode
 from urlparse import parse_qs
 import base64
@@ -170,8 +171,10 @@ def get_user(email):
     '''
     # We do this by accessing the CKAN model directly, because there isn't a
     # way to search for users by email address using the API yet.
-    import ckan.model
-    users = ckan.model.User.by_email(email)
+    users = meta.Session.query(User).filter(
+        User.email == email,
+        User.state != core.State.DELETED
+    ).all()
 
     assert len(users) in (0, 1), ("The Discourse-SSO-Client plugin doesn't know"
                                   " what to do when CKAN has more than one user"
