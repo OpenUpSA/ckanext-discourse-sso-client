@@ -1,18 +1,18 @@
 # Based on https://github.com/ckan/ckanext-persona/blob/master/ckanext/persona/plugin.py
 
+from ckan.common import config
+from urllib import urlencode
+from urlparse import parse_qs
+import base64
+import ckan.lib.helpers as helpers
 import ckan.plugins as plugins
 import ckan.plugins.toolkit as toolkit
-import logging
-import pylons
-from ckan.common import config
-import os
-from urllib import urlencode
-import base64
-import hmac
 import hashlib
-from urlparse import parse_qs
+import hmac
+import logging
+import os
+import pylons
 import re
-import ckan.lib.helpers as helpers
 
 
 logger = logging.getLogger(__name__)
