@@ -97,6 +97,8 @@ class SSOPlugin(plugins.SingletonPlugin):
         if user:
             # We've found a logged-in user. Set c.user to let CKAN know.
             toolkit.c.user = user
+        else:
+            logger.debug("No user in session")
 
     def _delete_session_items(self):
         if 'ckanext-discourse-sso-client-user' in pylons.session:
