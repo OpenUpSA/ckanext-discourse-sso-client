@@ -115,9 +115,6 @@ class SSOPlugin(plugins.SingletonPlugin):
         # Delete the session item, so that identify() will no longer find it.
         self._delete_session_items()
 
-        toolkit.redirect_to(get_sso_logout_url())
-
-
     def abort(self, status_code, detail, headers, comment):
         '''Handle an abort.'''
 
