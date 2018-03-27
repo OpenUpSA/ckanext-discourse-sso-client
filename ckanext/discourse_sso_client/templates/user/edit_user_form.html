@@ -31,6 +31,14 @@
 
   </fieldset>
 
+  <fieldset>
+    {{ form.hidden('old_password', value=data.oldpassword) }}
+
+    {{ form.hidden('password1', value=data.password1) }}
+
+    {{ form.hidden('password2', value=data.password2) }}
+  </fieldset>
+
   <div class="form-actions">
     {% block delete_button %}
       {% if h.check_access('user_delete', {'id': data.id})  %}
