@@ -64,14 +64,12 @@ class SSOPlugin(plugins.SingletonPlugin):
                 # A user with this email address doesn't yet exist in CKAN,
                 # so create one.
                 logger.debug("Creating user from SSO response %r", response)
-                user_dict = {'email': email,
-                             'name': generate_username(response['username'][0]),
-                             'password': generate_password(),
-                             'fullname': response['name'][0],
+                user_dict = {
+                    'email': email,
+                    'name': generate_username(response['username'][0]),
+                    'password': generate_password(),
+                    'fullname': response['name'][0],
                 }
-                #fullname = response['name'][0]
-                #if fullname:
-                #    user_dict['fullname'] = fullname
 
                 user = toolkit.get_action('user_create')(
                     context={'ignore_auth': True},
@@ -101,7 +99,6 @@ class SSOPlugin(plugins.SingletonPlugin):
             toolkit.c.user = user
 
     def _delete_session_items(self):
-        import pylons
         if 'ckanext-discourse-sso-client-user' in pylons.session:
             del pylons.session['ckanext-discourse-sso-client-user']
         if 'ckanext-discourse-sso-client-came_from' in pylons.session:
