@@ -51,6 +51,8 @@ Config Settings
 
 sso.url or environment variable CKAN_SSO_URL e.g. http://localhost:8000/ckan/sso
 
+sso.logout_url or environment variable CKAN_SSO_LOGOUT_URL e.g. http://localhost:8000/accounts/logout
+
 sso.secret or evironment variable CKAN_SSO_SECRET
 
 
