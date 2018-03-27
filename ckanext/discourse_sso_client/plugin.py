@@ -26,6 +26,10 @@ def get_sso_url():
     return os.environ.get('CKAN_SSO_URL', config.get('sso.url'))
 
 
+def get_sso_logout_url():
+    return os.environ.get('CKAN_SSO_LOGOUT_URL', config.get('sso.logout_url'))
+
+
 class SSOPlugin(plugins.SingletonPlugin):
     """Set up plugin for CKAN integration."""
 
@@ -43,7 +47,7 @@ class SSOPlugin(plugins.SingletonPlugin):
         """Login the user with credentials from the SocialAuth used. The CKAN
         username is created and access given.
         """
-        logger.info("\n\nLOGIN\n\n")
+        logger.debug("\n\nLOGIN\n\n")
 
         params = toolkit.request.params
 
@@ -59,11 +63,19 @@ class SSOPlugin(plugins.SingletonPlugin):
             if not user:
                 # A user with this email address doesn't yet exist in CKAN,
                 # so create one.
+                logger.debug("Creating user from SSO response %r", response)
+                user_dict = {'email': email,
+                             'name': generate_username(response['username'][0]),
+                             'password': generate_password(),
+                             'fullname': response['name'][0],
+                }
+                #fullname = response['name'][0]
+                #if fullname:
+                #    user_dict['fullname'] = fullname
+
                 user = toolkit.get_action('user_create')(
                     context={'ignore_auth': True},
-                    data_dict={'email': email,
-                               'name': generate_user_name(email),
-                               'password': generate_password()})
+                    data_dict=user_dict)
 
             pylons.session['ckanext-discourse-sso-client-user'] = user['name']
             pylons.session.save()
@@ -80,7 +92,7 @@ class SSOPlugin(plugins.SingletonPlugin):
         '''Identify which user (if any) is logged-in via Persona.
         If a logged-in user is found, set toolkit.c.user to be their user name.
         '''
-        logger.info("\n\nIDENTIFY\n\n")
+        logger.debug("\n\nIDENTIFY\n\n")
 
         # Try to get the item that login() placed in the session.
         user = pylons.session.get('ckanext-discourse-sso-client-user')
@@ -92,6 +104,10 @@ class SSOPlugin(plugins.SingletonPlugin):
         import pylons
         if 'ckanext-discourse-sso-client-user' in pylons.session:
             del pylons.session['ckanext-discourse-sso-client-user']
+        if 'ckanext-discourse-sso-client-came_from' in pylons.session:
+            del pylons.session['ckanext-discourse-sso-client-came_from']
+        if 'ckanext-discourse-sso-client-nonce' in pylons.session:
+            del pylons.session['ckanext-discourse-sso-client-nonce']
         pylons.session.save()
 
     def logout(self):
@@ -99,6 +115,9 @@ class SSOPlugin(plugins.SingletonPlugin):
 
         # Delete the session item, so that identify() will no longer find it.
         self._delete_session_items()
+
+        toolkit.redirect_to(get_sso_logout_url())
+
 
     def abort(self, status_code, detail, headers, comment):
         '''Handle an abort.'''
@@ -134,7 +153,7 @@ def validate_response(params):
         logger.debug("Invalid signature")
         toolkit.abort(401)
     raw_payload = base64.decodestring(payload)
-    response = parse_qs(raw_payload)
+    response = parse_qs(raw_payload, keep_blank_values=True)
     nonce = pylons.session['ckanext-discourse-sso-client-nonce']
     if not hmac.compare_digest(nonce, response['nonce'][0]):
         toolkit.abort(401)
@@ -174,10 +193,9 @@ def get_user(email):
         return None
 
 
-def generate_user_name(email):
+def generate_username(username):
     '''Generate a random user name for the given email address.
     '''
-    username = re.sub('@.+', '', email)
     username = re.sub('\W+', '_', username)
     return str(username)
 
