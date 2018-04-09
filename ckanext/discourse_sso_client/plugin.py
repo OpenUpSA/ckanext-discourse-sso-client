@@ -119,8 +119,7 @@ class SSOPlugin(plugins.SingletonPlugin):
     def abort(self, status_code, detail, headers, comment):
         '''Handle an abort.'''
 
-        # Delete the session item, so that identify() will no longer find it.
-        self._delete_session_items()
+        return (status_code, detail, headers, comment)
 
 
 def start_sso():
