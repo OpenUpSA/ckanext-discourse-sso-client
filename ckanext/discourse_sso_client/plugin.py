@@ -45,10 +45,10 @@ class SSOPlugin(plugins.SingletonPlugin):
         toolkit.add_resource('fanstatic', 'persona')
 
     def login(self):
-        """Login the user with credentials from the SocialAuth used. The CKAN
+        """
+        Login the user with credentials from the SocialAuth used. The CKAN
         username is created and access given.
         """
-        logger.debug("\n\nLOGIN\n\n")
 
         params = toolkit.request.params
 
@@ -88,18 +88,14 @@ class SSOPlugin(plugins.SingletonPlugin):
             start_sso()
 
     def identify(self):
-        '''Identify which user (if any) is logged-in via Persona.
+        '''Identify which user (if any) is logged-in
         If a logged-in user is found, set toolkit.c.user to be their user name.
         '''
-        logger.debug("\n\nIDENTIFY\n\n")
-
         # Try to get the item that login() placed in the session.
         user = pylons.session.get('ckanext-discourse-sso-client-user')
         if user:
             # We've found a logged-in user. Set c.user to let CKAN know.
             toolkit.c.user = user
-        else:
-            logger.debug("No user in session")
 
     def _delete_session_items(self):
         if 'ckanext-discourse-sso-client-user' in pylons.session:
