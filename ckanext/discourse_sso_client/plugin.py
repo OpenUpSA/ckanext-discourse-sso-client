@@ -76,7 +76,7 @@ class SSOPlugin(plugins.SingletonPlugin):
                     context={'ignore_auth': True},
                     data_dict=user_dict)
 
-            pylons.session['ckanext-discourse-sso-client-user'] = user['name']
+            pylons.session['ckanext-discourse-sso-client-user-id'] = user['id']
             pylons.session.save()
             self.identify()
 
@@ -92,14 +92,16 @@ class SSOPlugin(plugins.SingletonPlugin):
         If a logged-in user is found, set toolkit.c.user to be their user name.
         '''
         # Try to get the item that login() placed in the session.
-        user = pylons.session.get('ckanext-discourse-sso-client-user')
-        if user:
+        user_id = pylons.session.get('ckanext-discourse-sso-client-user-id')
+
+        if user_id:
             # We've found a logged-in user. Set c.user to let CKAN know.
-            toolkit.c.user = user
+            user = User.get(user_id)
+            toolkit.c.user = user.name
 
     def _delete_session_items(self):
-        if 'ckanext-discourse-sso-client-user' in pylons.session:
-            del pylons.session['ckanext-discourse-sso-client-user']
+        if 'ckanext-discourse-sso-client-user-id' in pylons.session:
+            del pylons.session['ckanext-discourse-sso-client-user-id']
         if 'ckanext-discourse-sso-client-came_from' in pylons.session:
             del pylons.session['ckanext-discourse-sso-client-came_from']
         if 'ckanext-discourse-sso-client-nonce' in pylons.session:
